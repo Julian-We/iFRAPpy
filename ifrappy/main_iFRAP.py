@@ -16,6 +16,7 @@ import csv
 import json
 from datetime import datetime
 from IPython.display import clear_output
+import pickle
 
 
 class experiment:
@@ -39,7 +40,8 @@ class experiment:
             },
             'log': []
         }
-        self.fitparameters_per_experiment = pd.DataFrame(index=['a1', 'k1', 'a2', 'k2', 'b', 'rsq', 't(1/2) fast', 't(1/2) slow', 'tau fast', 'tau slow'])
+        self.fitparameters_per_experiment = pd.DataFrame(
+            index=['a1', 'k1', 'a2', 'k2', 'b', 'rsq', 't(1/2) fast', 't(1/2) slow', 'tau fast', 'tau slow'])
         try:
             self.tfig_path = self.p_xprt + os.path.sep + 'figs' + os.path.sep + 'transparant' + os.path.sep
             os.makedirs(self.tfig_path)
@@ -360,24 +362,6 @@ class experiment:
             plt.close()
         self.json_update('log', 'Animation plot created and saved')
 
-    def per_experiment_values(self, category, triagery=None):
-        exp_dict = self.dict_experiments
-        try:
-            triagery = exp_dict.keys() if triagery is None else triagery
-        except:
-            triagery = exp_dict.keys()
-        dict_for_df = {}
-        for k, v in exp_dict.items():
-            if k in triagery:
-                experiment = v[2].fit_parameters_per_experiment
-                data = experiment.loc[category]
-                dict_for_df.update({
-                    k: data.values
-                })
-        dframe = pd.DataFrame(dict([(key, pd.Series(value)) for key, value in dict_for_df.items()]))
-
-        return dframe
-
     def create_fit_data(self):
 
         self.bleach_end_frame = abs(self.timesteps - self.bleach_end_time).argmin()
@@ -564,7 +548,8 @@ class ExperimentExistError(Exception):
 
 # TODO Beside the summary-method of calculating tau-value and t0.5 collect the fit-values from every sample and plot this (as a sort of supplementary plot
 class ExperimentGroup():
-    def __init__(self, csv, ctrl_csv=None, ctrl_name='Control', poi_name='Protein of interest', batch_file_mode=False):
+    def __init__(self, csv, ctrl_csv=None, ctrl_name='Control', poi_name='Protein of interest', batch_file_mode=False,
+                 pickle_name='ExperimentGroup_object'):
         self.batch_csv = csv
         self.mw = 0
         self.disorder_percent = 0
@@ -578,9 +563,12 @@ class ExperimentGroup():
             'log': [],
             'experiments': []  # This should be the last line
         }
+        self.pickle_file = os.path.join(csv, pickle_name + '.obj')
         self.dict_experiments = {}
         self.fit_parameters_per_experiment = pd.DataFrame(
             index=['a1', 'k1', 'a2', 'k2', 'b', 'rsq', 't(1/2) fast', 't(1/2) slow', 'tau fast', 'tau slow'])
+        self.filelist = []
+
     def to_json(self):
         try:
             # This fuction is supposed to be passed at the end of ever other function to be certain ensure proper documentation
@@ -750,6 +738,9 @@ class ExperimentGroup():
         # except Exception as e:# RuntimeWarning or RuntimeError:
         # print(f'of {e}')
         # c = [1,1,1,1,1]
+        # print('Values', c)
+        # print('Covarince', ccov)
+        # print('STD', np.sqrt(np.diag(ccov)))
         ccov = np.sqrt(np.diag(ccov))
         fit_parameters = dict({'a1': c[0], 'k1': c[1], 'a2': c[2], 'k2': c[3], 'b': c[0] + c[2]})
         fit_parameters_sigma = dict({
@@ -777,6 +768,9 @@ class ExperimentGroup():
             fit_parameters_sigma['tau fast'] = 1 / fit_parameters_sigma.get('k1')
             fit_parameters_sigma['tau slow'] = 1 / fit_parameters_sigma.get('k2')
 
+            fit_parameters_sigma['% fast'] = fit_parameters_sigma.get('k1') / fit_parameters.get('k1')
+            fit_parameters_sigma['% slow'] = fit_parameters_sigma.get('k2') / fit_parameters.get('k2')
+
         else:
             fit_parameters['t(1/2) fast'] = np.log(2) / fit_parameters.get('k2')
             fit_parameters['t(1/2) slow'] = np.log(2) / fit_parameters.get('k1')
@@ -789,6 +783,9 @@ class ExperimentGroup():
 
             fit_parameters_sigma['tau fast'] = 1 / fit_parameters_sigma.get('k2')
             fit_parameters_sigma['tau slow'] = 1 / fit_parameters_sigma.get('k1')
+
+            fit_parameters_sigma['% fast'] = fit_parameters_sigma.get('k2') / fit_parameters.get('k2')
+            fit_parameters_sigma['% slow'] = fit_parameters_sigma.get('k1') / fit_parameters.get('k1')
 
         self.json_update('log', 'Two phase exponential decay fit has been applied')
 
@@ -813,7 +810,6 @@ class ExperimentGroup():
         self.json_update('fit parameters', fit_parameters)
         self.json_update('log', 'Fit protocol finished')
         self.to_json()
-
 
     def json_update(self, key, value):
         if key.lower() == 'log':
@@ -846,6 +842,12 @@ class ExperimentGroup():
         plt.savefig(os.path.join(self.export_path, f'fit_{os.path.basename(self.batch_csv)}.pdf'))
         plt.ioff()
 
+    def recover_experiment(self):
+        # TODO Introduce a function which is able to recover a protien object from file
+        fp = open(self.pickle_file, 'rb')
+        slf = pickle.load(fp)
+        self.__dict__.update(slf.__dict__)
+
     def add_experiment(self, protein_name, embryonic_stage, experiment_path, batch_file_mode=False, molecular_weight=0,
                        disorder=0):
         """One experiment is added to the dict of experiments
@@ -853,6 +855,7 @@ class ExperimentGroup():
         Molecular weight in kDa
         """
         exp = ExperimentGroup(experiment_path)
+        self.filelist.append(os.listdir(experiment_path))
         exp_name = protein_name + f' {embryonic_stage}hpf'
         exp.mw = molecular_weight
         exp.disorder_percent = disorder
@@ -866,9 +869,12 @@ class ExperimentGroup():
 
         self.dict_experiments.update({exp_name: [protein_name, embryonic_stage, exp]})
         self.json_update('log', f'Experiment "{exp_name}" has been added to the experiment group')
+        tmp_pickle = open(self.pickle_file, 'wb')
+        pickle.dump(self, tmp_pickle)
+        tmp_pickle.close()
         return exp
 
-    # TODO Impement a selection based on age and protein as in plot_experiments()
+    # TODO Implement a selection based on age and protein as in plot_experiments()
     # TODO Implement a way select which error data should be used for the calculation (single-method or summary method; see todo @520
     def plot_molecular_weight(self, include_disorder=False, mega_graph=False):
 
@@ -971,7 +977,7 @@ class ExperimentGroup():
         a = 0
         for key, item in selection_dict.items():
             xp = item[2]
-            tau_sem = xp.fit_parameters_sigma["tau slow"] / np.sqrt(xp.sample_count)
+            tau_sem = xp.fit_parameters_sigma["% slow"] * xp.fit_parameters["tau slow"]
             color = self.get_protein_color(item[0], 'early' if item[1] < 15 else 'late')
             fle_name = str(key).replace(' ', '_')
             fit_x, fit_y = xp.json_masterfile['2P exp fit data']
@@ -1127,6 +1133,24 @@ class ExperimentGroup():
                                 colWidths=[0.1, 0.1]
                                 )
         plt.savefig(os.path.join(self.export_path, f'{ctrl_fle_name}_and_{poi_fle_name}2.pdf'))
+
+    def per_experiment_values(self, category, triagery=None):
+        exp_dict = self.dict_experiments
+        try:
+            triagery = exp_dict.keys() if triagery is None else triagery
+        except:
+            triagery = exp_dict.keys()
+        dict_for_df = {}
+        for k, v in exp_dict.items():
+            if k in triagery:
+                experiment = v[2].fit_parameters_per_experiment
+                data = experiment.loc[category]
+                dict_for_df.update({
+                    k: data.values
+                })
+        dframe = pd.DataFrame(dict([(key, pd.Series(value)) for key, value in dict_for_df.items()]))
+
+        return dframe
 
     def experiment_without_control(self, batch_file_mode=False, root_path=''):
         time_start = time.perf_counter()
