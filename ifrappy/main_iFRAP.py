@@ -188,7 +188,7 @@ class experiment:
         :returns Noth
         """
         try:
-            # print(self.p_act_granule, '\n',self.p_bckgrnd, '\n',self.p_ref, '\n',self.p_other_gran)
+            print(self.p_act_granule, '\n',self.p_bckgrnd, '\n',self.p_ref, '\n',self.p_other_gran)
             _, analyze_out, analyze_area = self.dataextractor(self.p_act_granule)
             # print('active')
             _, background_out, background_area = self.dataextractor(self.p_bckgrnd)
@@ -600,8 +600,9 @@ class ExperimentGroup():
                         elif 'back' in csvfiles and csvfiles.startswith('.') == False:
                             sample_paths.update({'background-path': os.path.join(rootdir, 'csv', csvfiles)})
                         elif 'adj' or 'sec' in csvfiles and csvfiles.startswith('.') == False:
-                            sample_paths.update({'adjacent-path': os.path.join(rootdir, 'csv', csvfiles)})
-                if sample_paths['adjacent-path'] == None:
+                            # sample_paths.update({'adjacent-path': os.path.join(rootdir, 'csv', csvfiles)})
+                            pass
+                if sample_paths['adjacent-path'] is None:
                     sample_paths.update({'adjacent-path': sample_paths['activated-path']})
                 sample_paths.update({'export-path': os.path.join(rootdir, 'xprt')})
                 try:
@@ -854,6 +855,7 @@ class ExperimentGroup():
         Embryonic Stage (int): hours post fertilization
         Molecular weight in kDa
         """
+
         exp = ExperimentGroup(experiment_path)
         self.filelist.append(os.listdir(experiment_path))
         exp_name = protein_name + f' {embryonic_stage}hpf'
@@ -927,7 +929,7 @@ class ExperimentGroup():
                 plt.savefig(os.path.join(self.export_path, 'mw_diffusion2.pdf'))
 
     def plot_experiments(self, experiments, developmental_stage=[], prompt=False, plot_all=False, save_path=None,
-                         plot_fit=True):
+                         plot_fit=True, **kwargs):
         """
         This is a selector for ExperimentGroup.plot_multiple().
 
@@ -965,20 +967,30 @@ class ExperimentGroup():
 
         self.plot_multiple(pass_on_dict,
                            save_path=save_path,
-                           plotfit=plot_fit
+                           plotfit=plot_fit,
+                           **kwargs
                            )
 
     # TODO reformat the whole plotting portion to make it more flexible. Remodel like so:
     # The plotting functions first argument is an plt.axis on which it plots. This way figures can be plotted modularly
     #
-    def plot_multiple(self, selection_dict, save_path=None, plotfit=True):
-        colors = ['#F6493E', '#A53EF6', '#EE4F9C', '#FEC953', '#99CC99', '#4DA64D', '#56C4C1', '#0D6973', '#2C3F59']
-        fig, ax = plt.subplots(figsize=(15, 5))
+    def plot_multiple(self, selection_dict, save_path=None, plotfit=True, color_palette=None, protein_colors=True, axes=None):
+        if color_palette == None:
+            colors = ['#F6493E', '#A53EF6', '#EE4F9C', '#FEC953', '#99CC99', '#4DA64D', '#56C4C1', '#0D6973', '#2C3F59']
+        else:
+            colors = color_palette
+        if axes is None:
+            fig, ax = plt.subplots(figsize=(15, 5))
+        else:
+            ax=axes
         a = 0
-        for key, item in selection_dict.items():
+        for i, (key, item) in enumerate(selection_dict.items()):
             xp = item[2]
             tau_sem = xp.fit_parameters_sigma["% slow"] * xp.fit_parameters["tau slow"]
-            color = self.get_protein_color(item[0], 'early' if item[1] < 15 else 'late')
+            if protein_colors:
+                color = self.get_protein_color(item[0], 'early' if item[1] < 15 else 'late')
+            else:
+                color = colors[i]
             fle_name = str(key).replace(' ', '_')
             fit_x, fit_y = xp.json_masterfile['2P exp fit data']
             plot_x, plot_y = xp.json_masterfile["raw sum data"]
@@ -994,7 +1006,13 @@ class ExperimentGroup():
             ax.set_xlabel(
                 'Time post-bleaching [s]')  # TODO A variable as property of the object which states whether this is a bleaching or photoactivation matter
             ax.set_ylabel('Normalized fluorescence intensity')
-            ax.set_xlim(-1, 65)
+            if i == 0:
+                previous_xlim = 10000000000000000
+            else:
+                _, previous_xlim = ax.get_xlim()
+            if previous_xlim < max(plot_x)+3:
+                ax.set_xlim(-1, max(plot_x)+3)
+
             a += 1
         ax.legend(loc='upper right')
         if save_path != None:

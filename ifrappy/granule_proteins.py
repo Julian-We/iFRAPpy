@@ -128,3 +128,31 @@ def generate_glycogenase_data(**kwargs):
 #                             molecular_weight=44.98995, disorder=0)
 # nos24 = frap.add_experiment('Nanos', 24, '/Volumes/HELHEIM/analyzed_data/diffusivity/FRAP_nanos/24hpf',
 #                             molecular_weight=44.98995, disorder=0)
+
+
+def generate_rna_data(**kwargs):
+    the_dict = {
+        "Nanos3'UTR 400pg" : [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/400pg/nos'],
+        "Globin3'UTR 400pg": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/400pg/glob'],
+        "Tdrd7a3'UTR 400pg": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/400pg/tdrd7'],
+        "Nanos3'UTR 600pg": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/600pg/nos'],
+        "Globin3'UTR 600pg": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/600pg/globin'],
+        "Tdrd7a3'UTR 600pg": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/202306_RNAinfluence/600pg/tdrd7a'],
+    }
+
+    furapu = generate_frap_data(the_dict, '/Volumes/HELHEIM/analyzed_data/diffusivity/group_data',
+                                pckl_name='RNA_influence', **kwargs)
+
+    return furapu
+
+
+def generate_tdrd7mo_data(**kwargs):
+    the_dict = {
+        "Control MO" : [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/tdrd7MO_gra/controlMO'],
+        "Tdrd7a MO": [10, '/Volumes/HELHEIM/analyzed_data/diffusivity/tdrd7MO_gra/tdrd7MO']
+    }
+
+    furapu = generate_frap_data(the_dict, '/Volumes/HELHEIM/analyzed_data/diffusivity/group_data',
+                                pckl_name='Tdrd7a_KD_granulito ', **kwargs)
+
+    return furapu

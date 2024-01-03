@@ -6,7 +6,7 @@ import pandas as pd
 import scipy.stats as stats
 
 
-def bar_graphs(axes, experiment, names, query, save_name=None, colors=None):
+def bar_graphs(axes, experiment, names, query, save_name=None, color_palette=None):
     taus = []
     taus_err = []
     if 'slow' in query:
@@ -16,8 +16,10 @@ def bar_graphs(axes, experiment, names, query, save_name=None, colors=None):
     else:
         speed_error = '% slow'
     # x = []
-    if colors == None:
+    if color_palette is None:
         colors = []
+    else:
+        colors = color_palette
     ages = []
     proteins = []
     for name in names:
@@ -28,7 +30,7 @@ def bar_graphs(axes, experiment, names, query, save_name=None, colors=None):
         hpf = experiment.dict_experiments[name][1]
         err = xxp.fit_parameters[query] * xxp.fit_parameters_sigma[speed_error]
         color = experiment.get_protein_color(protein, 'early' if hpf < 15 else 'late')
-        if not colors:
+        if color_palette is None:
             colors.append(color)
         taus.append(tau)
         proteins.append(protein)
@@ -51,6 +53,10 @@ def swarmy_boxes(axes, data_dict, colors=None):
 
     sns.boxplot(data=df, ax=axes, fliersize=0, palette=colors)
     sns.swarmplot(data=df, ax=axes, color='#22262a', s=4)
+
+
+def overlay_recovery_curves(ax, experiment, selection, colors=None, **kwargs):
+    experiment.plot_experiments(selection, color_palette=colors, axes=ax, **kwargs)
 
 
 def convert_pvalue_to_asterisks(pvalue):
